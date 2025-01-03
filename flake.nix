@@ -4,33 +4,56 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils}: 
+  outputs = { self, nixpkgs, flake-utils, rust-overlay }: 
   flake-utils.lib.eachDefaultSystem (system:
     let
-      system = "aarch64-darwin";
-      name = "FlexAuth";
-      src = ./.;
-      pkgs = nixpkgs.legacyPackages.${system};
-    in
-    {
-      packages.${system}.default = derivation {
-        inherit name system src;
-        
-        buildInputs = with pkgs; [
-          rust
-          cargo
-        ];
-
-        phases = [ "buildPhase" ];
-        buildPhase = ''
-          CARGO_TARGET_DIR=$out ${nixpkgs.cargo}/bin/cargo build --manifest-path $src/Cargo.toml --release 
-          ${nixpkgs.binutils}/bin/strip $out/release/flakes -o /tmp/test
-          rm -rf $out
-          mv /tmp/test $out
-        '';
+      # name = "FlexAuth";
+      # src = ./.;
+      overlays = [ (import rust-overlay) ];
+      pkgs = import nixpkgs {
+            inherit system overlays;
       };
-    }
+    in
+    with pkgs;
+        {
+          devShells.default = mkShell {
+            nativeBuildInputs = [
+              rust-bin.stable.latest.default
+              openssl_1_1
+              pkg-config
+            ];
+
+            buildInputs = [
+              openssl_1_1
+              pkg-config 
+              zlib 
+            ];
+
+            CARGO_HOME = "${pkgs.writeTextDir "cargo-home" ""}";
+            OPENSSL_DIR = "${openssl_1_1}";
+          };
+
+          packages.default = pkgs.rustPlatform.buildRustPackage {
+            pname = "inhouse-auth";
+            version = "0.1.0";
+            src = ./.;
+
+            nativeBuildInputs = [
+              openssl
+              pkg-config
+            ];
+
+            cargoHash = "sha256-wZ5q6Ghkr9/14cLZqASlPZZI4pktxmHy0BxOmzIbrMM=";
+          };
+        }
   );
 }
