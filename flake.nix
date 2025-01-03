@@ -2,16 +2,26 @@
   description = "FlexAuth - inhouse-auth";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, flake-utils }: {
-    packages."aarch64-darwin".default = derivation {
-      name = "FlexAuth";
-      system = "aarch64-darwin";
-      src = ./.;
-      buildInputs = [ nixpkgs.cargo nixpkgs.binutils ];
+  outputs = { self, nixpkgs }: 
+  let
+    system = "aarch64-darwin";
+    name = "FlexAuth";
+    src = ./.;
+    pkgs = nixpkgs.legacyPackages.${system};
+  in
+  {
+    packages.${system}.default = derivation {
+      
+      inherit name system src;
+      
+      buildInputs = with pkgs; [
+        rust
+        cargo
+      ];
+
       phases = [ "buildPhase" ];
       buildPhase = ''
         CARGO_TARGET_DIR=$out ${nixpkgs.cargo}/bin/cargo build --manifest-path $src/Cargo.toml --release 
